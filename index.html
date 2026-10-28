@@ -317,6 +317,32 @@
       color: #9e958a;
     }
 
+    /* Aviso dinámico mientras pinta el fantasmita */
+    .painting-notice {
+      margin-top: 12px;
+      padding: 9px 14px;
+      background: #fff8f0;
+      border: 1px dashed rgba(255, 122, 0, 0.35);
+      border-radius: 12px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-align: center;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .painting-notice.active {
+      background: #fff3e8;
+      border-color: var(--cempasuchil);
+      color: #92400e;
+      box-shadow: 0 2px 10px rgba(255, 122, 0, 0.12);
+      font-weight: 600;
+    }
+
     /* Modal o Pop de revelación */
     .twist-banner {
       display: none;
@@ -665,9 +691,14 @@
             <div class="color-swatch" style="background: #ffd166;" onclick="selectColor('#ffd166', this)"></div>
           </div>
 
+          <!-- Aviso interactivo mientras pinta el fantasmita -->
+          <div class="painting-notice" id="paintingNotice">
+            <span>🎨 Pinta tu fantasmita libremente</span>
+          </div>
+
           <div class="action-row">
             <button class="btn-clean" onclick="clearFigurinePaint()">🧹 Limpiar yeso</button>
-            <span class="hint-label">Desliza para pintar libremente</span>
+            <span class="hint-label">Desliza para pintar</span>
           </div>
         </div>
 
@@ -807,6 +838,8 @@
     // ===== MOTOR PROFESIONAL DE PINTURA EN YESO CON TEMPORIZADOR DE 9 SEGUNDOS =====
     let timerStarted = false;
     let paintTimer = null;
+    let countdownInterval = null;
+    let timeLeft = 9;
     let planRevealed = false;
 
     function resizePaintCanvas() {
@@ -865,25 +898,53 @@
       drawWhitePlasterBase();
       if (!planRevealed) {
         clearTimeout(paintTimer);
+        clearInterval(countdownInterval);
         timerStarted = false;
+        timeLeft = 9;
         const pill = document.getElementById('counterPill');
         pill.style.background = '#ffffff';
         pill.style.color = 'var(--text-muted)';
         pill.innerHTML = `<span>🎨 Toca para pintar</span>`;
+
+        const notice = document.getElementById('paintingNotice');
+        if (notice) {
+          notice.classList.remove('active');
+          notice.innerHTML = `<span>🎨 Pinta tu fantasmita libremente</span>`;
+        }
+
         document.getElementById('twistBanner').style.display = 'none';
       }
     }
 
-    // Iniciar temporizador de 9 segundos al comenzar a pintar
+    // Iniciar temporizador al comenzar a pintar avisando que espere unos segundos
     function startPaintTimerIfNeeded() {
       if (timerStarted || planRevealed) return;
       timerStarted = true;
+      timeLeft = 9;
 
       const pill = document.getElementById('counterPill');
-      pill.innerHTML = `<span>🎨 Pintando figurita...</span>`;
+      pill.innerHTML = `<span>⏳ Espera unos segundos...</span>`;
       pill.style.background = '#fff8f0';
 
+      const notice = document.getElementById('paintingNotice');
+      if (notice) {
+        notice.classList.add('active');
+        notice.innerHTML = `🎨 Sigue pintando el fantasmita... espera unos segundos para pasar a la siguiente parte ✨ (<b>${timeLeft}s</b>)`;
+      }
+
+      countdownInterval = setInterval(() => {
+        timeLeft--;
+        if (timeLeft > 0) {
+          if (notice) {
+            notice.innerHTML = `🎨 Sigue pintando el fantasmita... espera unos segundos para pasar a la siguiente parte ✨ (<b>${timeLeft}s</b>)`;
+          }
+        } else {
+          clearInterval(countdownInterval);
+        }
+      }, 1000);
+
       paintTimer = setTimeout(() => {
+        clearInterval(countdownInterval);
         revealRealPlan();
       }, 9000); // 9 segundos exactos
     }
@@ -892,11 +953,18 @@
     function revealRealPlan() {
       if (planRevealed) return;
       planRevealed = true;
+      clearInterval(countdownInterval);
 
       const pill = document.getElementById('counterPill');
       pill.innerHTML = `<span>✨ ¡Obra de arte lista!</span>`;
       pill.style.background = '#fff0e5';
       pill.style.color = 'var(--cempasuchil)';
+
+      const notice = document.getElementById('paintingNotice');
+      if (notice) {
+        notice.classList.add('active');
+        notice.innerHTML = `✨ <b>¡Fantasmita terminado!</b> Mira lo que sigue aquí abajo 👇`;
+      }
 
       const banner = document.getElementById('twistBanner');
       banner.style.display = 'block';
