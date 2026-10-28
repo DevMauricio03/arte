@@ -592,8 +592,7 @@
         <div class="studio-box">
           <div class="studio-topbar">
             <div class="counter-pill" id="counterPill">
-              <span>Nivel de arte:</span>
-              <strong id="splatCount">0%</strong>
+              <span>🎨 Toca para pintar</span>
             </div>
 
             <div class="tool-selector">
@@ -805,51 +804,15 @@
     let lastX = 0;
     let lastY = 0;
 
-    // ===== SISTEMA DE COBERTURA REAL DEL CUERPO DEL FANTASMA =====
-    let coveragePoints = [];
-
-    function initCoveragePoints() {
-      coveragePoints = [];
-      const cx = paintCanvas.width / 2;
-      const cy = paintCanvas.height / 2 + 5;
-      const topY = cy - 98;
-      const bottomY = cy + 90;
-
-      // Generar puntos de control dentro de la silueta real del fantasma
-      for (let py = topY; py <= bottomY; py += 12) {
-        const normY = Math.max(0, Math.min(1, (py - topY) / (bottomY - topY)));
-        // Curva del ancho del fantasmita de arriba hacia abajo
-        const halfW = 16 + Math.pow(normY, 0.55) * 44;
-        for (let px = cx - halfW; px <= cx + halfW; px += 12) {
-          coveragePoints.push({ x: px, y: py, covered: false });
-        }
-      }
-    }
-
-    function markCoverage(x, y, radius = 22) {
-      let newlyCovered = false;
-      const r2 = radius * radius;
-      for (let i = 0; i < coveragePoints.length; i++) {
-        const p = coveragePoints[i];
-        if (!p.covered) {
-          const dx = p.x - x;
-          const dy = p.y - y;
-          if (dx * dx + dy * dy <= r2) {
-            p.covered = true;
-            newlyCovered = true;
-          }
-        }
-      }
-      if (newlyCovered) {
-        updateProgress();
-      }
-    }
+    // ===== MOTOR PROFESIONAL DE PINTURA EN YESO CON TEMPORIZADOR DE 9 SEGUNDOS =====
+    let timerStarted = false;
+    let paintTimer = null;
+    let planRevealed = false;
 
     function resizePaintCanvas() {
       const stage = document.getElementById('stage');
       paintCanvas.width = stage.clientWidth;
       paintCanvas.height = stage.clientHeight;
-      initCoveragePoints();
       drawWhitePlasterBase();
     }
     window.addEventListener('resize', resizePaintCanvas);
@@ -869,7 +832,6 @@
       const centerY = paintCanvas.height / 2 + 5;
 
       targetCtx.beginPath();
-      // Silueta suave del fantasmita
       const topY = centerY - 105;
       const bottomY = centerY + 95;
       const leftX = centerX - 55;
@@ -901,14 +863,53 @@
     function clearFigurinePaint() {
       ctx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
       drawWhitePlasterBase();
-      if (coveragePoints) {
-        coveragePoints.forEach(p => p.covered = false);
+      if (!planRevealed) {
+        clearTimeout(paintTimer);
+        timerStarted = false;
+        const pill = document.getElementById('counterPill');
+        pill.style.background = '#ffffff';
+        pill.style.color = 'var(--text-muted)';
+        pill.innerHTML = `<span>🎨 Toca para pintar</span>`;
+        document.getElementById('twistBanner').style.display = 'none';
       }
-      document.getElementById('twistBanner').style.display = 'none';
+    }
+
+    // Iniciar temporizador de 9 segundos al comenzar a pintar
+    function startPaintTimerIfNeeded() {
+      if (timerStarted || planRevealed) return;
+      timerStarted = true;
+
       const pill = document.getElementById('counterPill');
-      pill.style.background = '#ffffff';
-      pill.style.color = 'var(--text-muted)';
-      pill.innerHTML = `<span>Rellenando:</span> <strong id="splatCount">0%</strong>`;
+      pill.innerHTML = `<span>🎨 Pintando figurita...</span>`;
+      pill.style.background = '#fff8f0';
+
+      paintTimer = setTimeout(() => {
+        revealRealPlan();
+      }, 9000); // 9 segundos exactos
+    }
+
+    // Revelar la invitación al cumplirse los 9 segundos
+    function revealRealPlan() {
+      if (planRevealed) return;
+      planRevealed = true;
+
+      const pill = document.getElementById('counterPill');
+      pill.innerHTML = `<span>✨ ¡Obra de arte lista!</span>`;
+      pill.style.background = '#fff0e5';
+      pill.style.color = 'var(--cempasuchil)';
+
+      const banner = document.getElementById('twistBanner');
+      banner.style.display = 'block';
+      banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      try {
+        confetti({
+          particleCount: 60,
+          spread: 75,
+          origin: { y: 0.7 },
+          colors: ['#ff7a00', '#e6007e', '#ffd166', '#7928ca']
+        });
+      } catch (err) {}
     }
 
     // Trazo de pincel fluido y suave
@@ -933,12 +934,6 @@
       ctx.stroke();
 
       ctx.restore();
-
-      // Marcar cobertura entre puntos
-      markCoverage(x2, y2, 22);
-      const midX = (x1 + x2) / 2;
-      const midY = (y1 + y2) / 2;
-      markCoverage(midX, midY, 22);
     }
 
     // Estampado decorativo de flor de Cempasúchil / Calaverita
@@ -964,8 +959,6 @@
       ctx.fill();
 
       ctx.restore();
-
-      markCoverage(x, y, 24);
     }
 
     function adjustBrightness(hex, percent) {
@@ -989,6 +982,8 @@
 
     paintCanvas.addEventListener('pointerdown', (e) => {
       isPainting = true;
+      startPaintTimerIfNeeded();
+
       const { x, y } = getCanvasCoords(e);
       lastX = x;
       lastY = y;
@@ -999,7 +994,6 @@
         paintBrushStroke(x, y, x + 0.1, y + 0.1);
       }
 
-      // Rebote ligero de la figurita
       const fig = document.getElementById('figurineSvg');
       fig.style.transform = 'scale(1.03)';
       setTimeout(() => fig.style.transform = 'scale(1)', 150);
@@ -1019,47 +1013,6 @@
     window.addEventListener('pointerup', () => {
       isPainting = false;
     });
-
-    function updateProgress() {
-      if (!coveragePoints.length) return;
-      const coveredCount = coveragePoints.filter(p => p.covered).length;
-      const total = coveragePoints.length;
-      
-      // Exigimos que pinte el 76% de la superficie para considerarlo relleno visual completo
-      const ratio = coveredCount / (total * 0.76);
-      const pct = Math.min(100, Math.floor(ratio * 100));
-
-      const countEl = document.getElementById('splatCount');
-      const pill = document.getElementById('counterPill');
-
-      if (pct < 100) {
-        if (countEl) {
-          countEl.innerText = `${pct}%`;
-        } else {
-          pill.innerHTML = `<span>Rellenando:</span> <strong id="splatCount">${pct}%</strong>`;
-        }
-      } else {
-        pill.innerHTML = `<span>🎨 ¡Fantasma 100% terminado!</span>`;
-        pill.style.background = '#fff0e5';
-        pill.style.color = 'var(--cempasuchil)';
-
-        // SOLO cuando se rellena la forma de verdad aparece el plan real
-        const banner = document.getElementById('twistBanner');
-        if (banner.style.display !== 'block') {
-          banner.style.display = 'block';
-          banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-          try {
-            confetti({
-              particleCount: 55,
-              spread: 75,
-              origin: { y: 0.7 },
-              colors: ['#ff7a00', '#e6007e', '#ffd166', '#7928ca']
-            });
-          } catch (err) {}
-        }
-      }
-    }
 
     // ===== FASE 3: PAD DE FIRMA TÁCTIL =====
     const signPad = document.getElementById('signPad');
