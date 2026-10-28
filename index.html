@@ -863,6 +863,10 @@
       ctx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
       drawWhitePlasterBase();
       strokePoints = 0;
+      document.getElementById('twistBanner').style.display = 'none';
+      const pill = document.getElementById('counterPill');
+      pill.style.background = '#ffffff';
+      pill.style.color = 'var(--text-muted)';
       updateProgress();
     }
 
@@ -977,16 +981,21 @@
     });
 
     function updateProgress() {
-      const pct = Math.min(100, Math.floor((strokePoints / 75) * 100));
+      // Requerimos que pinte y rellene bien la figura para alcanzar el 100%
+      const pct = Math.min(100, Math.floor((strokePoints / 80) * 100));
       const countEl = document.getElementById('splatCount');
+      const pill = document.getElementById('counterPill');
+
       if (pct < 100) {
-        countEl.innerText = `${pct}%`;
+        if (countEl) countEl.innerText = `${pct}%`;
       } else {
-        countEl.innerText = `¡100% Listo!`;
+        pill.innerHTML = `<span>🎨 ¡Fantasma 100% terminado!</span>`;
+        pill.style.background = '#fff0e5';
+        pill.style.color = 'var(--cempasuchil)';
       }
 
-      // Al pintar el 60% o más se revela el banner de invitación
-      if (pct >= 60) {
+      // SOLO cuando se completa el 100% del relleno se revela el plan real
+      if (pct >= 100) {
         const banner = document.getElementById('twistBanner');
         if (banner.style.display !== 'block') {
           banner.style.display = 'block';
@@ -994,8 +1003,8 @@
 
           try {
             confetti({
-              particleCount: 40,
-              spread: 60,
+              particleCount: 50,
+              spread: 70,
               origin: { y: 0.7 },
               colors: ['#ff7a00', '#e6007e', '#ffd166', '#7928ca']
             });
