@@ -497,9 +497,9 @@
         <p class="lead">Toca la figura para salpicarle pintura y darle tu propio estilo de Día de Muertos:</p>
 
         <div class="studio-box">
-          <div class="counter-pill">
+          <div class="counter-pill" id="counterPill">
             <span>Salpicaduras:</span>
-            <strong id="splatCount">0</strong> / 3
+            <strong id="splatCount">0</strong> / 6
           </div>
 
           <div class="canvas-wrapper" id="canvasWrapper">
@@ -663,11 +663,12 @@
       }
     }
 
-    // ===== FASE 1: LIENZO Y SALPICADURAS DE PINTURA =====
+    // ===== FASE 1: LIENZO Y SALPICADURAS DE PINTURA ORGÁNICAS =====
     const paintCanvas = document.getElementById('paintCanvas');
     const ctx = paintCanvas.getContext('2d');
     let currentColor = '#ff7a00';
     let splashes = 0;
+    const TARGET_SPLASHES = 6;
 
     function resizePaintCanvas() {
       const wrapper = document.getElementById('canvasWrapper');
@@ -683,28 +684,74 @@
       element.classList.add('active');
     }
 
-    // Dibuja una salpicadura de pintura orgánica
+    // Dibuja una salpicadura realista de pintura tipo acrílico/pincel
     function drawSplash(x, y, color) {
       ctx.save();
       ctx.fillStyle = color;
+      ctx.strokeStyle = color;
 
-      // Mancha central
-      const mainRadius = 14 + Math.random() * 10;
+      const baseRadius = 14 + Math.random() * 12;
+
+      // 1. Mancha central deformada (polígono orgánico curvo, no circular)
+      const points = [];
+      const numPoints = 12 + Math.floor(Math.random() * 6);
+      for (let i = 0; i < numPoints; i++) {
+        const angle = (i / numPoints) * Math.PI * 2;
+        const variation = (Math.random() * 0.85 - 0.35) * baseRadius;
+        const r = Math.max(baseRadius * 0.45, baseRadius + variation);
+        points.push({
+          x: x + Math.cos(angle) * r,
+          y: y + Math.sin(angle) * r
+        });
+      }
+
       ctx.beginPath();
-      ctx.arc(x, y, mainRadius, 0, Math.PI * 2);
+      ctx.moveTo((points[0].x + points[points.length - 1].x) / 2, (points[0].y + points[points.length - 1].y) / 2);
+      for (let i = 0; i < points.length; i++) {
+        const next = points[(i + 1) % points.length];
+        const midX = (points[i].x + next.x) / 2;
+        const midY = (points[i].y + next.y) / 2;
+        ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+      }
+      ctx.closePath();
       ctx.fill();
 
-      // Gotas y salpicaduras alrededor
-      const drops = 6 + Math.floor(Math.random() * 6);
-      for (let i = 0; i < drops; i++) {
+      // 2. Tentáculos y estrías de pintura disparadas
+      const tendrils = 4 + Math.floor(Math.random() * 5);
+      for (let i = 0; i < tendrils; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const dist = mainRadius + 8 + Math.random() * 24;
-        const dropRadius = 2 + Math.random() * 4.5;
-        const dropX = x + Math.cos(angle) * dist;
-        const dropY = y + Math.sin(angle) * dist;
+        const length = baseRadius * (1.1 + Math.random() * 1.6);
+        const startR = baseRadius * 0.4;
+        const startX = x + Math.cos(angle) * startR;
+        const startY = y + Math.sin(angle) * startR;
+        const endX = x + Math.cos(angle) * length;
+        const endY = y + Math.sin(angle) * length;
 
         ctx.beginPath();
-        ctx.arc(dropX, dropY, dropRadius, 0, Math.PI * 2);
+        ctx.lineWidth = 1.5 + Math.random() * 3.5;
+        ctx.lineCap = 'round';
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        // Gota al final o un poco más allá
+        if (Math.random() > 0.3) {
+          const dropDist = length + 3 + Math.random() * 10;
+          const dropR = 1.5 + Math.random() * 3.5;
+          ctx.beginPath();
+          ctx.arc(x + Math.cos(angle) * dropDist, y + Math.sin(angle) * dropDist, dropR, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // 3. Gotitas finas de rocío alrededor
+      const microDrops = 10 + Math.floor(Math.random() * 12);
+      for (let i = 0; i < microDrops; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = baseRadius * 0.7 + Math.random() * (baseRadius * 2.2);
+        const r = 1 + Math.random() * 2.5;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(angle) * dist, y + Math.sin(angle) * dist, r, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -721,25 +768,36 @@
 
       // Efecto de rebote ligero en la figura
       const fig = document.getElementById('figurineSvg');
-      fig.style.transform = 'scale(1.05)';
-      setTimeout(() => fig.style.transform = 'scale(1)', 180);
+      fig.style.transform = 'scale(1.05) rotate(' + (Math.random() * 4 - 2) + 'deg)';
+      setTimeout(() => fig.style.transform = 'scale(1) rotate(0deg)', 180);
 
       splashes++;
-      document.getElementById('splatCount').innerText = Math.min(splashes, 3);
+      const pill = document.getElementById('counterPill');
+      if (splashes < TARGET_SPLASHES) {
+        document.getElementById('splatCount').innerText = splashes;
+      } else {
+        pill.innerHTML = `<span>🎨 ¡Obra de arte lista! (Toques: ${splashes})</span>`;
+        pill.style.background = '#fff0e5';
+        pill.style.color = 'var(--cempasuchil)';
+      }
 
-      // Al tercer toque se revela el twist
-      if (splashes >= 3) {
-        document.getElementById('twistBanner').style.display = 'block';
-        
-        // Confeti suave al desbloquear
-        try {
-          confetti({
-            particleCount: 30,
-            spread: 50,
-            origin: { y: 0.7 },
-            colors: ['#ff7a00', '#e6007e', '#ffd166']
-          });
-        } catch (err) {}
+      // Al llegar a 6 salpicaduras se revela el banner y puede seguir pintando si quiere
+      if (splashes >= TARGET_SPLASHES) {
+        const banner = document.getElementById('twistBanner');
+        if (banner.style.display !== 'block') {
+          banner.style.display = 'block';
+          banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          
+          // Confeti festivo al desbloquear
+          try {
+            confetti({
+              particleCount: 35,
+              spread: 55,
+              origin: { y: 0.7 },
+              colors: ['#ff7a00', '#e6007e', '#ffd166', '#7928ca']
+            });
+          } catch (err) {}
+        }
       }
     });
 
