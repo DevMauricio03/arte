@@ -805,10 +805,51 @@
     let lastX = 0;
     let lastY = 0;
 
+    // ===== SISTEMA DE COBERTURA REAL DEL CUERPO DEL FANTASMA =====
+    let coveragePoints = [];
+
+    function initCoveragePoints() {
+      coveragePoints = [];
+      const cx = paintCanvas.width / 2;
+      const cy = paintCanvas.height / 2 + 5;
+      const topY = cy - 98;
+      const bottomY = cy + 90;
+
+      // Generar puntos de control dentro de la silueta real del fantasma
+      for (let py = topY; py <= bottomY; py += 12) {
+        const normY = Math.max(0, Math.min(1, (py - topY) / (bottomY - topY)));
+        // Curva del ancho del fantasmita de arriba hacia abajo
+        const halfW = 16 + Math.pow(normY, 0.55) * 44;
+        for (let px = cx - halfW; px <= cx + halfW; px += 12) {
+          coveragePoints.push({ x: px, y: py, covered: false });
+        }
+      }
+    }
+
+    function markCoverage(x, y, radius = 22) {
+      let newlyCovered = false;
+      const r2 = radius * radius;
+      for (let i = 0; i < coveragePoints.length; i++) {
+        const p = coveragePoints[i];
+        if (!p.covered) {
+          const dx = p.x - x;
+          const dy = p.y - y;
+          if (dx * dx + dy * dy <= r2) {
+            p.covered = true;
+            newlyCovered = true;
+          }
+        }
+      }
+      if (newlyCovered) {
+        updateProgress();
+      }
+    }
+
     function resizePaintCanvas() {
       const stage = document.getElementById('stage');
       paintCanvas.width = stage.clientWidth;
       paintCanvas.height = stage.clientHeight;
+      initCoveragePoints();
       drawWhitePlasterBase();
     }
     window.addEventListener('resize', resizePaintCanvas);
@@ -826,8 +867,6 @@
     function applyGhostClip(targetCtx) {
       const centerX = paintCanvas.width / 2;
       const centerY = paintCanvas.height / 2 + 5;
-      const scaleX = 1;
-      const scaleY = 1.05;
 
       targetCtx.beginPath();
       // Silueta suave del fantasmita
@@ -862,12 +901,14 @@
     function clearFigurinePaint() {
       ctx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
       drawWhitePlasterBase();
-      strokePoints = 0;
+      if (coveragePoints) {
+        coveragePoints.forEach(p => p.covered = false);
+      }
       document.getElementById('twistBanner').style.display = 'none';
       const pill = document.getElementById('counterPill');
       pill.style.background = '#ffffff';
       pill.style.color = 'var(--text-muted)';
-      updateProgress();
+      pill.innerHTML = `<span>Rellenando:</span> <strong id="splatCount">0%</strong>`;
     }
 
     // Trazo de pincel fluido y suave
@@ -877,7 +918,7 @@
 
       ctx.strokeStyle = currentColor;
       ctx.fillStyle = currentColor;
-      ctx.lineWidth = 22;
+      ctx.lineWidth = 24;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
@@ -887,11 +928,17 @@
       ctx.stroke();
 
       // Pincelada con textura suave
-      ctx.lineWidth = 14;
+      ctx.lineWidth = 15;
       ctx.strokeStyle = adjustBrightness(currentColor, 12);
       ctx.stroke();
 
       ctx.restore();
+
+      // Marcar cobertura entre puntos
+      markCoverage(x2, y2, 22);
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+      markCoverage(midX, midY, 22);
     }
 
     // Estampado decorativo de flor de Cempasúchil / Calaverita
@@ -899,26 +946,26 @@
       ctx.save();
       applyGhostClip(ctx);
 
-      // Pétalos de flor
       const petals = 8;
-      const r = 12;
+      const r = 13;
       ctx.fillStyle = currentColor;
       for (let i = 0; i < petals; i++) {
         const angle = (i / petals) * Math.PI * 2;
         const px = x + Math.cos(angle) * r;
         const py = y + Math.sin(angle) * r;
         ctx.beginPath();
-        ctx.arc(px, py, 6, 0, Math.PI * 2);
+        ctx.arc(px, py, 6.5, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Centro de flor
       ctx.fillStyle = '#ffd166';
       ctx.beginPath();
-      ctx.arc(x, y, 6.5, 0, Math.PI * 2);
+      ctx.arc(x, y, 7, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
+
+      markCoverage(x, y, 24);
     }
 
     function adjustBrightness(hex, percent) {
@@ -948,18 +995,14 @@
 
       if (currentTool === 'stamp') {
         stampFlower(x, y);
-        strokePoints += 15;
       } else {
         paintBrushStroke(x, y, x + 0.1, y + 0.1);
-        strokePoints += 4;
       }
 
       // Rebote ligero de la figurita
       const fig = document.getElementById('figurineSvg');
       fig.style.transform = 'scale(1.03)';
       setTimeout(() => fig.style.transform = 'scale(1)', 150);
-
-      updateProgress();
     });
 
     paintCanvas.addEventListener('pointermove', (e) => {
@@ -968,12 +1011,9 @@
 
       if (currentTool === 'brush') {
         paintBrushStroke(lastX, lastY, x, y);
-        strokePoints += 2;
       }
       lastX = x;
       lastY = y;
-
-      updateProgress();
     });
 
     window.addEventListener('pointerup', () => {
@@ -981,21 +1021,29 @@
     });
 
     function updateProgress() {
-      // Requerimos que pinte y rellene bien la figura para alcanzar el 100%
-      const pct = Math.min(100, Math.floor((strokePoints / 80) * 100));
+      if (!coveragePoints.length) return;
+      const coveredCount = coveragePoints.filter(p => p.covered).length;
+      const total = coveragePoints.length;
+      
+      // Exigimos que pinte el 76% de la superficie para considerarlo relleno visual completo
+      const ratio = coveredCount / (total * 0.76);
+      const pct = Math.min(100, Math.floor(ratio * 100));
+
       const countEl = document.getElementById('splatCount');
       const pill = document.getElementById('counterPill');
 
       if (pct < 100) {
-        if (countEl) countEl.innerText = `${pct}%`;
+        if (countEl) {
+          countEl.innerText = `${pct}%`;
+        } else {
+          pill.innerHTML = `<span>Rellenando:</span> <strong id="splatCount">${pct}%</strong>`;
+        }
       } else {
         pill.innerHTML = `<span>🎨 ¡Fantasma 100% terminado!</span>`;
         pill.style.background = '#fff0e5';
         pill.style.color = 'var(--cempasuchil)';
-      }
 
-      // SOLO cuando se completa el 100% del relleno se revela el plan real
-      if (pct >= 100) {
+        // SOLO cuando se rellena la forma de verdad aparece el plan real
         const banner = document.getElementById('twistBanner');
         if (banner.style.display !== 'block') {
           banner.style.display = 'block';
@@ -1003,8 +1051,8 @@
 
           try {
             confetti({
-              particleCount: 50,
-              spread: 70,
+              particleCount: 55,
+              spread: 75,
               origin: { y: 0.7 },
               colors: ['#ff7a00', '#e6007e', '#ffd166', '#7928ca']
             });
